@@ -1,0 +1,23 @@
+# Variables de entorno locales
+.env
+.env.*
+!.env.example
+
+# Logs y backups locales
+*.log
+*.bak
+*.tmp
+*.swp
+
+# Datos persistentes (no deberian existir, pero por si acaso)
+data/
+mysql_data/
+volumes/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.idea/
+.vscode/

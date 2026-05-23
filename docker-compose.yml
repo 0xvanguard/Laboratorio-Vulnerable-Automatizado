@@ -1,0 +1,231 @@
+# =============================================================================
+# Laboratorio Vulnerable Automatizado - Docker Compose
+# =============================================================================
+#
+# Topologia (simulando un entorno corporativo segmentado):
+#
+#   Internet (host)
+#         |
+#   [edge_net]  ------ unica red expuesta al host (DMZ)
+#         |
+#   [proxy] (Nginx mal configurado intencionalmente)
+#         |
+#   [app_net]  ------ red interna de aplicaciones (sin internet)
+#     /    |    \
+#   dvwa  juice  phpmyadmin
+#     \                  /
+#      [db_net]  ------ red de datos aislada (internal: true)
+#         |
+#       mysql
+#
+# IMPORTANTE: este laboratorio contiene vulnerabilidades intencionales.
+# NO lo expongas a internet ni a redes corporativas reales.
+# =============================================================================
+
+name: lab-vulnerable
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Proxy reverso INTENCIONALMENTE mal configurado.
+  # Es la unica pieza expuesta al host.
+  # Vease docs/VULNERABILIDADES.md seccion "Proxy reverso".
+  # ---------------------------------------------------------------------------
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    image: lab-vulnerable/proxy:latest
+    container_name: lab-proxy
+    hostname: proxy.lab.local
+    restart: unless-stopped
+    ports:
+      # Puerto principal del laboratorio (landing + ruteo)
+      - "${LAB_HTTP_PORT:-8080}:80"
+      # Acceso "directo" a DVWA via proxy (path /dvwa/)
+      - "${LAB_DVWA_PORT:-8081}:81"
+      # Acceso "directo" a Juice Shop via proxy (path /juice/)
+      - "${LAB_JUICE_PORT:-8082}:82"
+      # Endpoint de estado de Nginx expuesto (misconfiguracion #7)
+      - "${LAB_STATUS_PORT:-8088}:8088"
+    networks:
+      edge_net:
+        aliases:
+          - proxy.lab.local
+      app_net:
+        aliases:
+          - proxy.internal
+    depends_on:
+      dvwa:
+        condition: service_started
+      juice-shop:
+        condition: service_started
+      phpmyadmin:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      lab.role: "edge-proxy"
+      lab.exposed: "true"
+      lab.misconfigured: "true"
+
+  # ---------------------------------------------------------------------------
+  # DVWA - Damn Vulnerable Web Application
+  # No expone puertos al host: solo accesible via proxy.
+  # ---------------------------------------------------------------------------
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    container_name: lab-dvwa
+    hostname: dvwa.app.local
+    restart: unless-stopped
+    environment:
+      # DVWA lee /etc/php.d/... pero ademas honra estas variables en la imagen
+      DB_SERVER: mysql
+      DB_DATABASE: dvwa
+      DB_USERNAME: dvwa
+      DB_PASSWORD: ${DVWA_DB_PASSWORD:-p@ssw0rd}
+    networks:
+      app_net:
+        aliases:
+          - dvwa.app.local
+      db_net: {}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    labels:
+      lab.role: "vulnerable-app"
+      lab.app: "dvwa"
+
+  # ---------------------------------------------------------------------------
+  # OWASP Juice Shop (vulnerable por diseno)
+  # Solo accesible via proxy.
+  # ---------------------------------------------------------------------------
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: lab-juice-shop
+    hostname: juice.app.local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: unsafe
+    networks:
+      app_net:
+        aliases:
+          - juice.app.local
+    # Juice Shop usa SQLite embebido: no toca db_net.
+    labels:
+      lab.role: "vulnerable-app"
+      lab.app: "juice-shop"
+
+  # ---------------------------------------------------------------------------
+  # MariaDB para DVWA. Aislada en db_net (internal: true).
+  # NO expone puertos al host: solo dvwa y phpmyadmin pueden alcanzarla.
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mariadb:10.11
+    container_name: lab-mysql
+    hostname: mysql.db.local
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MARIADB_DATABASE: dvwa
+      MARIADB_USER: dvwa
+      MARIADB_PASSWORD: ${DVWA_DB_PASSWORD:-p@ssw0rd}
+      # Misconfiguracion intencional: permitir conexiones sin SSL y autenticacion debil
+      MARIADB_AUTO_UPGRADE: "1"
+    command:
+      - --bind-address=0.0.0.0
+      - --skip-name-resolve
+      - --general-log=1
+      - --general-log-file=/var/log/mysql/general.log
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      db_net:
+        aliases:
+          - mysql.db.local
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    labels:
+      lab.role: "database"
+      lab.exposed: "false"
+
+  # ---------------------------------------------------------------------------
+  # phpMyAdmin "olvidado" en el entorno (misconfiguracion clasica).
+  # Accesible internamente y publicado por el proxy en /dbadmin/ sin auth extra.
+  # ---------------------------------------------------------------------------
+  phpmyadmin:
+    image: phpmyadmin:5-apache
+    container_name: lab-phpmyadmin
+    hostname: dbadmin.app.local
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      # Misconfiguracion intencional: permitir login con root sin restricciones
+      PMA_ARBITRARY: "1"
+      UPLOAD_LIMIT: 256M
+    networks:
+      app_net:
+        aliases:
+          - dbadmin.app.local
+      db_net: {}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    labels:
+      lab.role: "admin-tool"
+      lab.misconfigured: "true"
+
+# =============================================================================
+# Redes segmentadas (simulan zonas DMZ / interna / datos)
+# =============================================================================
+networks:
+
+  # DMZ: unica red conectada al host. Aqui vive solo el proxy.
+  edge_net:
+    name: lab_edge_net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+    labels:
+      lab.zone: "dmz"
+
+  # Red interna de aplicaciones. Sin salida a internet.
+  # internal: true evita que los contenedores lleguen al gateway/Internet.
+  app_net:
+    name: lab_app_net
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.20.0/24
+    labels:
+      lab.zone: "internal-apps"
+
+  # Red de datos aislada. Solo db y los servicios que la requieren.
+  db_net:
+    name: lab_db_net
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.30.0/24
+    labels:
+      lab.zone: "data"
+
+# =============================================================================
+# Volumenes persistentes
+# =============================================================================
+volumes:
+  mysql_data:
+    name: lab_mysql_data
