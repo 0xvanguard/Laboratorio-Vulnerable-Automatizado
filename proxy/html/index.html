@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Laboratorio Vulnerable Automatizado</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root {
+      --bg:#0d1117; --fg:#e6edf3; --muted:#8b949e;
+      --accent:#ff7b72; --ok:#3fb950; --warn:#d29922; --link:#58a6ff;
+      --card:#161b22; --border:#30363d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin:0; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--fg); line-height: 1.5;
+    }
+    header { padding: 32px 24px; border-bottom: 1px solid var(--border); }
+    header h1 { margin:0 0 8px 0; }
+    header p  { margin:0; color: var(--muted); }
+    main { max-width: 1080px; margin: 0 auto; padding: 24px; }
+    .warn {
+      background: #2d1b00; border:1px solid var(--warn); color: var(--warn);
+      padding:16px; border-radius:8px; margin: 16px 0 24px 0;
+    }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+    .card {
+      background: var(--card); border:1px solid var(--border); border-radius:8px;
+      padding:16px;
+    }
+    .card h3 { margin: 0 0 8px 0; }
+    .card p  { margin: 0 0 12px 0; color: var(--muted); }
+    .card .tag {
+      display:inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+      background: #21262d; color: var(--muted); margin-right: 6px;
+    }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background:#21262d; padding: 2px 6px; border-radius: 4px; }
+    footer { color: var(--muted); padding: 24px; text-align:center; border-top:1px solid var(--border); margin-top: 32px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Laboratorio Vulnerable Automatizado</h1>
+  <p>Entorno academico segmentado para practicar SQLi, XSS, escalada de privilegios y mala configuracion de proxies reversos.</p>
+</header>
+<main>
+  <div class="warn">
+    <strong>Aviso:</strong> este entorno contiene vulnerabilidades intencionales.
+    Usalo solo en una red privada y aislada. NO lo expongas a internet ni a redes corporativas.
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>DVWA</h3>
+      <p>Damn Vulnerable Web Application. Modulos de SQLi, XSS, CSRF, command injection, etc.</p>
+      <span class="tag">PHP</span><span class="tag">MariaDB</span>
+      <p style="margin-top:12px;">
+        <a href="/dvwa/">Abrir via proxy</a> &middot;
+        <a href="http://localhost:8081/">Puerto directo (8081)</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>OWASP Juice Shop</h3>
+      <p>Aplicacion moderna (Node + Angular) con docenas de retos del Top 10 de OWASP.</p>
+      <span class="tag">Node.js</span><span class="tag">SQLite</span>
+      <p style="margin-top:12px;">
+        <a href="/juice/">Abrir via proxy</a> &middot;
+        <a href="http://localhost:8082/">Puerto directo (8082)</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>phpMyAdmin (mal configurado)</h3>
+      <p>Panel de administracion de la base de datos publicado sin autenticacion adicional.</p>
+      <span class="tag">misconfig</span>
+      <p style="margin-top:12px;">
+        <a href="/dbadmin/">Abrir /dbadmin/</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Estado de Nginx</h3>
+      <p>Endpoint <code>stub_status</code> expuesto sin ACL. Util para enumeracion.</p>
+      <span class="tag">misconfig</span>
+      <p style="margin-top:12px;">
+        <a href="/nginx_status">/nginx_status</a> &middot;
+        <a href="http://localhost:8088/">:8088/</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Estaticos / backups</h3>
+      <p>Directorio con autoindex on. Plantamos un <code>backup.txt</code> con secretos falsos.</p>
+      <span class="tag">misconfig</span>
+      <p style="margin-top:12px;">
+        <a href="/assets/">/assets/</a> &middot;
+        <a href="/backup/">/backup/</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Documentacion</h3>
+      <p>Arquitectura, vulnerabilidades documentadas y advertencia etica.</p>
+      <p style="margin-top:12px;">
+        <a href="https://github.com/0xvanguard/Laboratorio-Vulnerable-Automatizado">Repositorio</a>
+      </p>
+    </div>
+  </div>
+</main>
+<footer>
+  Laboratorio Vulnerable Automatizado &middot; uso academico &middot; MIT License
+</footer>
+</body>
+</html>

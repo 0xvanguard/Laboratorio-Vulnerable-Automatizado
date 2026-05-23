@@ -1,0 +1,6 @@
+# [MISCONFIG bonus] robots.txt que filtra rutas "secretas".
+User-agent: *
+Disallow: /backup/
+Disallow: /assets/
+Disallow: /dbadmin/
+Disallow: /nginx_status
